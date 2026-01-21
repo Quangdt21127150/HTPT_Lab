@@ -33,10 +33,10 @@ const (
 type UserServiceClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*User, error)
 	GetAll(ctx context.Context, in *GetAllRequest, opts ...grpc.CallOption) (*GetAllResponse, error)
-	Count(ctx context.Context, in *CountRequest, opts ...grpc.CallOption) (*CountResponse, error)
-	Insert(ctx context.Context, in *InsertRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
-	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
-	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*EmptyResponse, error)
+	Count(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*CountResponse, error)
+	Insert(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
+	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
+	Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
 }
 
 type userServiceClient struct {
@@ -67,7 +67,7 @@ func (c *userServiceClient) GetAll(ctx context.Context, in *GetAllRequest, opts 
 	return out, nil
 }
 
-func (c *userServiceClient) Count(ctx context.Context, in *CountRequest, opts ...grpc.CallOption) (*CountResponse, error) {
+func (c *userServiceClient) Count(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*CountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CountResponse)
 	err := c.cc.Invoke(ctx, UserService_Count_FullMethodName, in, out, cOpts...)
@@ -77,9 +77,9 @@ func (c *userServiceClient) Count(ctx context.Context, in *CountRequest, opts ..
 	return out, nil
 }
 
-func (c *userServiceClient) Insert(ctx context.Context, in *InsertRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+func (c *userServiceClient) Insert(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyResponse)
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, UserService_Insert_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -87,9 +87,9 @@ func (c *userServiceClient) Insert(ctx context.Context, in *InsertRequest, opts 
 	return out, nil
 }
 
-func (c *userServiceClient) Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+func (c *userServiceClient) Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyResponse)
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, UserService_Set_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -97,9 +97,9 @@ func (c *userServiceClient) Set(ctx context.Context, in *SetRequest, opts ...grp
 	return out, nil
 }
 
-func (c *userServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*EmptyResponse, error) {
+func (c *userServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyResponse)
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, UserService_Delete_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -113,10 +113,10 @@ func (c *userServiceClient) Delete(ctx context.Context, in *DeleteRequest, opts 
 type UserServiceServer interface {
 	Get(context.Context, *GetRequest) (*User, error)
 	GetAll(context.Context, *GetAllRequest) (*GetAllResponse, error)
-	Count(context.Context, *CountRequest) (*CountResponse, error)
-	Insert(context.Context, *InsertRequest) (*EmptyResponse, error)
-	Set(context.Context, *SetRequest) (*EmptyResponse, error)
-	Delete(context.Context, *DeleteRequest) (*EmptyResponse, error)
+	Count(context.Context, *EmptyRequest) (*CountResponse, error)
+	Insert(context.Context, *SetRequest) (*SuccessResponse, error)
+	Set(context.Context, *SetRequest) (*SuccessResponse, error)
+	Delete(context.Context, *DeleteRequest) (*SuccessResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
 }
 
@@ -133,16 +133,16 @@ func (UnimplementedUserServiceServer) Get(context.Context, *GetRequest) (*User, 
 func (UnimplementedUserServiceServer) GetAll(context.Context, *GetAllRequest) (*GetAllResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAll not implemented")
 }
-func (UnimplementedUserServiceServer) Count(context.Context, *CountRequest) (*CountResponse, error) {
+func (UnimplementedUserServiceServer) Count(context.Context, *EmptyRequest) (*CountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Count not implemented")
 }
-func (UnimplementedUserServiceServer) Insert(context.Context, *InsertRequest) (*EmptyResponse, error) {
+func (UnimplementedUserServiceServer) Insert(context.Context, *SetRequest) (*SuccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Insert not implemented")
 }
-func (UnimplementedUserServiceServer) Set(context.Context, *SetRequest) (*EmptyResponse, error) {
+func (UnimplementedUserServiceServer) Set(context.Context, *SetRequest) (*SuccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Set not implemented")
 }
-func (UnimplementedUserServiceServer) Delete(context.Context, *DeleteRequest) (*EmptyResponse, error) {
+func (UnimplementedUserServiceServer) Delete(context.Context, *DeleteRequest) (*SuccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Delete not implemented")
 }
 func (UnimplementedUserServiceServer) mustEmbedUnimplementedUserServiceServer() {}
@@ -203,7 +203,7 @@ func _UserService_GetAll_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _UserService_Count_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CountRequest)
+	in := new(EmptyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -215,13 +215,13 @@ func _UserService_Count_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: UserService_Count_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UserServiceServer).Count(ctx, req.(*CountRequest))
+		return srv.(UserServiceServer).Count(ctx, req.(*EmptyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _UserService_Insert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InsertRequest)
+	in := new(SetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -233,7 +233,7 @@ func _UserService_Insert_Handler(srv interface{}, ctx context.Context, dec func(
 		FullMethod: UserService_Insert_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UserServiceServer).Insert(ctx, req.(*InsertRequest))
+		return srv.(UserServiceServer).Insert(ctx, req.(*SetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

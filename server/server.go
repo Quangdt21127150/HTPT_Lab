@@ -90,28 +90,36 @@ func loadFromBunt(db *fastdb.DB, path string) error {
 	return nil
 }
 
-func validateUserJSON(userJSON string) (*User, error) {
-	var u User
-	if err := json.Unmarshal([]byte(userJSON), &u); err != nil {
-		return nil, errors.New("Invalid JSON format")
-	}
-	if u.ID <= 0 {
-		return nil, errors.New("ID must be positive")
+func validateUser(u *pb.User) error {
+	if u == nil {
+		return errors.New("User data required")
 	}
 	if u.Email == "" {
-		return nil, errors.New("Email required")
+		return errors.New("Email required")
 	}
 	if u.Password == "" {
-		return nil, errors.New("Password required")
+		return errors.New("Password required")
 	}
 	if u.UUID == "" {
-		return nil, errors.New("UUID required")
+		return errors.New("UUID required")
 	}
 	_, err := time.Parse(time.RFC3339, u.CreatedAt)
 	if err != nil {
-		return nil, errors.New("Invalid CreatedAt format")
+		return errors.New("Invalid CreatedAt format")
 	}
-	return &u, nil
+	return nil
+}
+
+func pbUserToUser(pbUser *pb.User, id int) *User {
+	return &User{
+		CreatedAt: pbUser.CreatedAt,
+		UUID:      pbUser.UUID,
+		Email:     pbUser.Email,
+		Password:  pbUser.Password,
+		Image:     pbUser.Image,
+		ID:        id,
+		IsAdmin:   pbUser.IsAdmin,
+	}
 }
 
 func NewServer() *server {
@@ -126,7 +134,7 @@ func NewServer() *server {
 }
 
 func (s *server) Get(ctx context.Context, req *pb.GetRequest) (*pb.User, error) {
-	data, ok := s.db.Get(bucket, int(req.Id))
+	data, ok := s.db.Get(bucket, int(req.ID))
 	if !ok {
 		return nil, status.Error(codes.NotFound, "User not found")
 	}
@@ -140,7 +148,6 @@ func (s *server) Get(ctx context.Context, req *pb.GetRequest) (*pb.User, error) 
 		Email:     u.Email,
 		Password:  u.Password,
 		Image:     u.Image,
-		ID:        int32(u.ID),
 		IsAdmin:   u.IsAdmin,
 	}, nil
 }
@@ -200,7 +207,6 @@ func (s *server) GetAll(ctx context.Context, req *pb.GetAllRequest) (*pb.GetAllR
 			Email:     u.Email,
 			Password:  u.Password,
 			Image:     u.Image,
-			ID:        int32(u.ID),
 			IsAdmin:   u.IsAdmin,
 		})
 	}
@@ -213,7 +219,7 @@ func (s *server) GetAll(ctx context.Context, req *pb.GetAllRequest) (*pb.GetAllR
 	}, nil
 }
 
-func (s *server) Count(ctx context.Context, req *pb.CountRequest) (*pb.CountResponse, error) {
+func (s *server) Count(ctx context.Context, req *pb.EmptyRequest) (*pb.CountResponse, error) {
 	all, err := s.db.GetAll(bucket)
 	if err != nil {
 		return &pb.CountResponse{Count: 0}, nil
@@ -221,59 +227,78 @@ func (s *server) Count(ctx context.Context, req *pb.CountRequest) (*pb.CountResp
 	return &pb.CountResponse{Count: int32(len(all))}, nil
 }
 
-func (s *server) Insert(ctx context.Context, req *pb.InsertRequest) (*pb.EmptyResponse, error) {
-	u, err := validateUserJSON(req.UserJson)
-	if err != nil {
+func (s *server) Insert(ctx context.Context, req *pb.SetRequest) (*pb.SuccessResponse, error) {
+	if req.ID <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "ID must be positive")
+	}
+
+	if req.Data == nil {
+		return nil, status.Error(codes.InvalidArgument, "User data required")
+	}
+
+	if err := validateUser(req.Data); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	_, ok := s.db.Get(bucket, u.ID)
+
+	_, ok := s.db.Get(bucket, int(req.ID))
 	if ok {
 		return nil, status.Error(codes.AlreadyExists, "User already exists")
 	}
-	err = s.db.Set(bucket, u.ID, []byte(req.UserJson))
+
+	u := pbUserToUser(req.Data, int(req.ID))
+	userJSON, err := json.Marshal(u)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	return &pb.EmptyResponse{}, nil
+
+	err = s.db.Set(bucket, u.ID, userJSON)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &pb.SuccessResponse{Success: true}, nil
 }
 
-func (s *server) Set(ctx context.Context, req *pb.SetRequest) (*pb.EmptyResponse, error) {
-	u, err := validateUserJSON(req.UserJson)
-	if err != nil {
+func (s *server) Set(ctx context.Context, req *pb.SetRequest) (*pb.SuccessResponse, error) {
+	if req.ID <= 0 {
+		return nil, status.Error(codes.InvalidArgument, "ID must be positive")
+	}
+
+	if req.Data == nil {
+		return nil, status.Error(codes.InvalidArgument, "User data required")
+	}
+
+	if err := validateUser(req.Data); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	existingData, exists := s.db.Get(bucket, u.ID)
+	_, exists := s.db.Get(bucket, int(req.ID))
 	if !exists {
 		return nil, status.Error(codes.NotFound, "User not found for update")
 	}
 
-	var existingUser User
-	if err := json.Unmarshal(existingData, &existingUser); err != nil {
-		return nil, status.Error(codes.Internal, "Invalid existing data")
-	}
-
-	if existingUser.ID != u.ID {
-		return nil, status.Error(codes.InvalidArgument, "Cannot change user ID during update")
-	}
-
-	err = s.db.Set(bucket, u.ID, []byte(req.UserJson))
+	u := pbUserToUser(req.Data, int(req.ID))
+	userJSON, err := json.Marshal(u)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return &pb.EmptyResponse{}, nil
+	err = s.db.Set(bucket, u.ID, userJSON)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &pb.SuccessResponse{Success: true}, nil
 }
 
-func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*pb.EmptyResponse, error) {
-	ok, err := s.db.Del(bucket, int(req.Id))
+func (s *server) Delete(ctx context.Context, req *pb.DeleteRequest) (*pb.SuccessResponse, error) {
+	ok, err := s.db.Del(bucket, int(req.ID))
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if !ok {
 		return nil, status.Error(codes.NotFound, "User not found")
 	}
-	return &pb.EmptyResponse{}, nil
+	return &pb.SuccessResponse{Success: true}, nil
 }
 
 func main() {

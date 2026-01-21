@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 
 	pb "github.com/marcelloh/fastdb/user"
 
@@ -41,7 +40,7 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) GetUser(id int32) (*User, error) {
-	resp, err := c.client.Get(context.Background(), &pb.GetRequest{Id: id})
+	resp, err := c.client.Get(context.Background(), &pb.GetRequest{ID: id})
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +50,7 @@ func (c *Client) GetUser(id int32) (*User, error) {
 		Email:     resp.Email,
 		Password:  resp.Password,
 		Image:     resp.Image,
-		ID:        int(resp.ID),
+		ID:        int(id),
 		IsAdmin:   resp.IsAdmin,
 	}, nil
 }
@@ -69,7 +68,6 @@ func (c *Client) GetAllUsers() ([]*User, error) {
 			Email:     pbUser.Email,
 			Password:  pbUser.Password,
 			Image:     pbUser.Image,
-			ID:        int(pbUser.ID),
 			IsAdmin:   pbUser.IsAdmin,
 		})
 	}
@@ -77,32 +75,53 @@ func (c *Client) GetAllUsers() ([]*User, error) {
 }
 
 func (c *Client) CountUsers() (int32, error) {
-	resp, err := c.client.Count(context.Background(), &pb.CountRequest{})
+	resp, err := c.client.Count(context.Background(), &pb.EmptyRequest{})
 	if err != nil {
 		return 0, err
 	}
 	return resp.Count, nil
 }
 
-func (c *Client) InsertUser(user *User) error {
-	userJSON, err := json.Marshal(user)
+func (c *Client) InsertUser(user *User) (bool, error) {
+	resp, err := c.client.Insert(context.Background(), &pb.SetRequest{
+		ID: int32(user.ID),
+		Data: &pb.User{
+			CreatedAt: user.CreatedAt,
+			UUID:      user.UUID,
+			Email:     user.Email,
+			Password:  user.Password,
+			Image:     user.Image,
+			IsAdmin:   user.IsAdmin,
+		},
+	})
 	if err != nil {
-		return err
+		return false, err
 	}
-	_, err = c.client.Insert(context.Background(), &pb.InsertRequest{UserJson: string(userJSON)})
-	return err
+	return resp.Success, nil
 }
 
-func (c *Client) UpdateUser(user *User) error {
-	userJSON, err := json.Marshal(user)
+func (c *Client) UpdateUser(user *User) (bool, error) {
+	resp, err := c.client.Set(context.Background(), &pb.SetRequest{
+		ID: int32(user.ID),
+		Data: &pb.User{
+			CreatedAt: user.CreatedAt,
+			UUID:      user.UUID,
+			Email:     user.Email,
+			Password:  user.Password,
+			Image:     user.Image,
+			IsAdmin:   user.IsAdmin,
+		},
+	})
 	if err != nil {
-		return err
+		return false, err
 	}
-	_, err = c.client.Set(context.Background(), &pb.SetRequest{UserJson: string(userJSON)})
-	return err
+	return resp.Success, nil
 }
 
-func (c *Client) DeleteUser(id int32) error {
-	_, err := c.client.Delete(context.Background(), &pb.DeleteRequest{Id: id})
-	return err
+func (c *Client) DeleteUser(id int32) (bool, error) {
+	resp, err := c.client.Delete(context.Background(), &pb.DeleteRequest{ID: id})
+	if err != nil {
+		return false, err
+	}
+	return resp.Success, nil
 }

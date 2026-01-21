@@ -10,12 +10,13 @@ message User {
   string Email     = 3;
   string Password  = 4;
   string Image     = 5;
-  int32  ID        = 6;
-  bool   IsAdmin   = 7;
+  bool   IsAdmin   = 6;
 }
 
+message EmptyRequest {}
+
 message GetRequest {
-  int32 id = 1;
+  int32 ID = 1;
 }
 
 message GetAllRequest {
@@ -30,31 +31,28 @@ message GetAllResponse {
   int32         limit  = 4;
 }
 
-message CountRequest {}
+message SetRequest {
+  int32 ID = 1;
+  User data = 2;
+}
 
 message CountResponse {
   int32 count = 1;
 }
 
-message InsertRequest {
-  string user_json = 1;
-}
-
-message SetRequest {
-  string user_json = 1;
-}
-
 message DeleteRequest {
-  int32 id = 1;
+  int32 ID = 1;
 }
 
-message EmptyResponse {}
+message SuccessResponse {
+  bool success = 1;
+}
 
 service UserService {
   rpc Get(GetRequest) returns (User);
   rpc GetAll(GetAllRequest) returns (GetAllResponse);
-  rpc Count(CountRequest) returns (CountResponse);
-  rpc Insert(InsertRequest) returns (EmptyResponse);
-  rpc Set(SetRequest) returns (EmptyResponse);
-  rpc Delete(DeleteRequest) returns (EmptyResponse);
+  rpc Count(EmptyRequest) returns (CountResponse);
+  rpc Insert(SetRequest) returns (SuccessResponse);
+  rpc Set(SetRequest) returns (SuccessResponse);
+  rpc Delete(DeleteRequest) returns (SuccessResponse);
 }
