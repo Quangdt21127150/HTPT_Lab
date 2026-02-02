@@ -72,13 +72,14 @@ func (s *UserServer) GetLeader(ctx context.Context, req *pb.EmptyRequest) (*pb.S
 
 func (s *UserServer) initiateElection() {
 	s.mu.Lock()
-	if s.currentLeader == s.config.myID {
+	currentLeader := s.currentLeader
+	if currentLeader == s.config.myID {
 		s.mu.Unlock()
 		return
 	}
 	s.mu.Unlock()
 
-	log.Printf("%s [Server %d] [Backup] Leader %d suspected failed, starting Ring election", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, s.currentLeader)
+	log.Printf("%s [Server %d] [Backup] Leader %d suspected failed, starting Ring election after delay", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
 
 	nextAddr := s.config.addressMap[s.config.peers[s.config.nextPeerIndex]]
 	conn, err := grpc.NewClient(nextAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))

@@ -19,7 +19,9 @@ import (
 	pb "github.com/marcelloh/fastdb/user"
 
 	"github.com/marcelloh/fastdb"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
@@ -50,6 +52,8 @@ type UserServer struct {
 	currentLeader       int
 	electionTriggered   bool
 	electionTriggeredMu sync.Mutex
+	leaderFailed        bool
+	healthCheckStop     chan bool
 }
 
 func loadLastLeader() int {
@@ -85,6 +89,7 @@ func NewUserServer(config *ServerConfig) *UserServer {
 		currentLeader:     -1,
 		isLeader:          false,
 		electionTriggered: false,
+		healthCheckStop:   make(chan bool, 1),
 	}
 
 	all, _ := config.db.GetAll(bucket)
@@ -118,7 +123,60 @@ func NewUserServer(config *ServerConfig) *UserServer {
 		}
 	}
 
+	// Start health check monitoring for backup servers
+	if !srv.isLeader {
+		go srv.monitorLeaderHealth()
+	}
+
 	return srv
+}
+
+func loadFromBunt(db *fastdb.DB, path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	for i := 4; i < len(lines); i += 4 {
+		key := strings.TrimSpace(lines[i])
+		i += 2
+		value := strings.TrimSpace(lines[i])
+		i++
+
+		if !strings.HasPrefix(key, "user_") {
+			continue
+		}
+
+		idStr := strings.TrimPrefix(key, "user_")
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			continue
+		}
+
+		_, ok := db.Get(bucket, id)
+		if ok {
+			continue
+		}
+
+		var u User
+		if err := json.Unmarshal([]byte(value), &u); err != nil {
+			continue
+		}
+		if u.ID != id {
+			continue
+		}
+
+		db.Set(bucket, id, []byte(value))
+	}
+	return nil
 }
 
 func (s *UserServer) copyDataFromLeader() error {
@@ -162,9 +220,7 @@ func (s *UserServer) copyDataFromLeader() error {
 	}
 
 	for id, data := range all {
-		if err := s.config.db.Set(bucket, id, data); err != nil {
-			return err
-		}
+		s.config.db.Set(bucket, id, data)
 	}
 
 	return nil
@@ -200,54 +256,6 @@ func validateUser(u *pb.UserDTO) error {
 	return nil
 }
 
-func loadFromBunt(db *fastdb.DB, path string) error {
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	content, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	lines := strings.Split(string(content), "\n")
-	i := 0
-	for i < len(lines) {
-		line := strings.TrimSpace(lines[i])
-		if line == "*3" {
-			i += 3
-			i += 1
-			key := strings.TrimSpace(lines[i])
-			i += 1
-			i += 1
-			value := strings.TrimSpace(lines[i])
-			i += 1
-
-			if after, ok := strings.CutPrefix(key, "user_"); ok {
-				idStr := after
-				id, err := strconv.Atoi(idStr)
-				if err != nil {
-					continue
-				}
-
-				var u User
-				if err := json.Unmarshal([]byte(value), &u); err != nil {
-					continue
-				}
-				if u.ID != id {
-					continue
-				}
-				db.Set(bucket, id, []byte(value))
-			}
-		} else {
-			i += 1
-		}
-	}
-	return nil
-}
-
 func (s *UserServer) checkIsLeader() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -264,6 +272,67 @@ func (s *UserServer) setLeader(leaderID int) {
 	s.electionTriggeredMu.Lock()
 	s.electionTriggered = false
 	s.electionTriggeredMu.Unlock()
+
+	if leaderID == s.config.myID {
+		select {
+		case s.healthCheckStop <- true:
+		default:
+		}
+	}
+}
+
+func handleLeaderFailed() {
+
+}
+
+func (s *UserServer) monitorLeaderHealth() {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.healthCheckStop:
+			return
+		case <-ticker.C:
+			s.mu.RLock()
+			currentLeader := s.currentLeader
+			isLeader := s.isLeader
+			s.mu.RUnlock()
+
+			if isLeader {
+				continue
+			}
+
+			if !s.isLeaderAlive(currentLeader) && !s.leaderFailed {
+				s.leaderFailed = true
+				log.Printf("%s [Server %d] [Backup] Leader %d is failed", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
+				handleLeaderFailed()
+			} else if s.isLeaderAlive(currentLeader) && s.leaderFailed {
+				s.leaderFailed = false
+				log.Printf("%s [Server %d] [Backup] Leader %d is restarted", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
+			}
+		}
+	}
+}
+
+func (s *UserServer) isLeaderAlive(leaderID int) bool {
+	if leaderID <= 0 {
+		return false
+	}
+
+	leaderAddr := s.config.addressMap[leaderID]
+	conn, err := grpc.NewClient(leaderAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+
+	client := pb.NewElectionServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err = client.Ping(ctx, &pb.EmptyRequest{})
+	return err == nil
 }
 
 func (s *UserServer) hasProcessed(reqID string) bool {
@@ -285,8 +354,8 @@ func (s *UserServer) localInsert(req *pb.SetRequest) (*pb.SuccessResponse, error
 	}
 
 	id := int(req.ID)
-	_, exists := s.config.db.Get(bucket, id)
-	if exists {
+	_, existUser := s.config.db.Get(bucket, id)
+	if existUser {
 		return nil, status.Error(codes.AlreadyExists, "User already exists")
 	}
 
@@ -314,8 +383,8 @@ func (s *UserServer) localSet(req *pb.SetRequest) (*pb.SuccessResponse, error) {
 	}
 
 	id := int(req.ID)
-	_, exists := s.config.db.Get(bucket, id)
-	if !exists {
+	_, existUser := s.config.db.Get(bucket, id)
+	if !existUser {
 		return nil, status.Error(codes.NotFound, "User not found")
 	}
 
@@ -339,8 +408,8 @@ func (s *UserServer) localSet(req *pb.SetRequest) (*pb.SuccessResponse, error) {
 
 func (s *UserServer) localDelete(req *pb.IDRequest) (*pb.SuccessResponse, error) {
 	id := int(req.ID)
-	_, exists := s.config.db.Get(bucket, id)
-	if !exists {
+	_, existUser := s.config.db.Get(bucket, id)
+	if !existUser {
 		return nil, status.Error(codes.NotFound, "User not found")
 	}
 

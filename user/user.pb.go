@@ -641,7 +641,7 @@ const file_user_proto_rawDesc = "" +
 	"\x0fSuccessResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x1a\n" +
 	"\bServerID\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\x05R\x02ID2\x8d\x04\n" +
+	"\x02ID\x18\x01 \x01(\x05R\x02ID2\xdd\x03\n" +
 	"\vUserService\x12\"\n" +
 	"\x03Get\x12\x0f.user.IDRequest\x1a\n" +
 	".user.User\x123\n" +
@@ -652,12 +652,12 @@ const file_user_proto_rawDesc = "" +
 	"\x06Delete\x12\x0f.user.IDRequest\x1a\x15.user.SuccessResponse\x12:\n" +
 	"\x0fReplicateInsert\x12\x10.user.SetRequest\x1a\x15.user.SuccessResponse\x127\n" +
 	"\fReplicateSet\x12\x10.user.SetRequest\x1a\x15.user.SuccessResponse\x129\n" +
-	"\x0fReplicateDelete\x12\x0f.user.IDRequest\x1a\x15.user.SuccessResponse\x12.\n" +
-	"\x04Ping\x12\x12.user.EmptyRequest\x1a\x12.user.EmptyRequest2\xad\x01\n" +
+	"\x0fReplicateDelete\x12\x0f.user.IDRequest\x1a\x15.user.SuccessResponse2\xdd\x01\n" +
 	"\x0fElectionService\x122\n" +
 	"\fSendElection\x12\x0e.user.ServerID\x1a\x12.user.EmptyRequest\x125\n" +
 	"\x0fSendCoordinator\x12\x0e.user.ServerID\x1a\x12.user.EmptyRequest\x12/\n" +
-	"\tGetLeader\x12\x12.user.EmptyRequest\x1a\x0e.user.ServerIDB\bZ\x06./userb\x06proto3"
+	"\tGetLeader\x12\x12.user.EmptyRequest\x1a\x0e.user.ServerID\x12.\n" +
+	"\x04Ping\x12\x12.user.EmptyRequest\x1a\x12.user.EmptyRequestB\bZ\x06./userb\x06proto3"
 
 var (
 	file_user_proto_rawDescOnce sync.Once
@@ -696,10 +696,10 @@ var file_user_proto_depIdxs = []int32{
 	6,  // 8: user.UserService.ReplicateInsert:input_type -> user.SetRequest
 	6,  // 9: user.UserService.ReplicateSet:input_type -> user.SetRequest
 	3,  // 10: user.UserService.ReplicateDelete:input_type -> user.IDRequest
-	2,  // 11: user.UserService.Ping:input_type -> user.EmptyRequest
-	9,  // 12: user.ElectionService.SendElection:input_type -> user.ServerID
-	9,  // 13: user.ElectionService.SendCoordinator:input_type -> user.ServerID
-	2,  // 14: user.ElectionService.GetLeader:input_type -> user.EmptyRequest
+	9,  // 11: user.ElectionService.SendElection:input_type -> user.ServerID
+	9,  // 12: user.ElectionService.SendCoordinator:input_type -> user.ServerID
+	2,  // 13: user.ElectionService.GetLeader:input_type -> user.EmptyRequest
+	2,  // 14: user.ElectionService.Ping:input_type -> user.EmptyRequest
 	0,  // 15: user.UserService.Get:output_type -> user.User
 	5,  // 16: user.UserService.GetAll:output_type -> user.GetAllResponse
 	7,  // 17: user.UserService.Count:output_type -> user.CountResponse
@@ -709,10 +709,10 @@ var file_user_proto_depIdxs = []int32{
 	8,  // 21: user.UserService.ReplicateInsert:output_type -> user.SuccessResponse
 	8,  // 22: user.UserService.ReplicateSet:output_type -> user.SuccessResponse
 	8,  // 23: user.UserService.ReplicateDelete:output_type -> user.SuccessResponse
-	2,  // 24: user.UserService.Ping:output_type -> user.EmptyRequest
-	2,  // 25: user.ElectionService.SendElection:output_type -> user.EmptyRequest
-	2,  // 26: user.ElectionService.SendCoordinator:output_type -> user.EmptyRequest
-	9,  // 27: user.ElectionService.GetLeader:output_type -> user.ServerID
+	2,  // 24: user.ElectionService.SendElection:output_type -> user.EmptyRequest
+	2,  // 25: user.ElectionService.SendCoordinator:output_type -> user.EmptyRequest
+	9,  // 26: user.ElectionService.GetLeader:output_type -> user.ServerID
+	2,  // 27: user.ElectionService.Ping:output_type -> user.EmptyRequest
 	15, // [15:28] is the sub-list for method output_type
 	2,  // [2:15] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name

@@ -71,12 +71,11 @@ service UserService {
   rpc ReplicateInsert(SetRequest) returns (SuccessResponse);
   rpc ReplicateSet(SetRequest) returns (SuccessResponse);
   rpc ReplicateDelete(IDRequest) returns (SuccessResponse);
-
-  rpc Ping(EmptyRequest) returns (EmptyRequest);
 }
 
 service ElectionService {
   rpc SendElection(ServerID) returns (EmptyRequest);
   rpc SendCoordinator(ServerID) returns (EmptyRequest);
   rpc GetLeader(EmptyRequest) returns (ServerID);
+  rpc Ping(EmptyRequest) returns (EmptyRequest);
 }
