@@ -86,7 +86,7 @@ func main() {
 	srv := NewUserServer(&config)
 
 	role := "Backup"
-	if srv.checkIsLeader() {
+	if srv.isLeader {
 		role = "Leader"
 	}
 

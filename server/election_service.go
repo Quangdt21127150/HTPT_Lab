@@ -70,6 +70,39 @@ func (s *UserServer) GetLeader(ctx context.Context, req *pb.EmptyRequest) (*pb.S
 	return &pb.ServerID{ID: int32(s.currentLeader)}, nil
 }
 
+func (s *UserServer) getNextAlivePeer(startIndex int) (int, string, bool) {
+	peers := s.config.peers
+	n := len(peers)
+	if n <= 1 {
+		return -1, "", false
+	}
+
+	for i := range n {
+		idx := (startIndex + i) % n
+		peerID := peers[idx]
+		if peerID == s.config.myID {
+			continue
+		}
+
+		addr := s.config.addressMap[peerID]
+		conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			continue
+		}
+
+		client := pb.NewElectionServiceClient(conn)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_, err = client.Ping(ctx, &pb.EmptyRequest{})
+		cancel()
+		conn.Close()
+
+		if err == nil {
+			return peerID, addr, true
+		}
+	}
+	return -1, "", false
+}
+
 func (s *UserServer) initiateElection() {
 	s.mu.Lock()
 	currentLeader := s.currentLeader
@@ -79,12 +112,17 @@ func (s *UserServer) initiateElection() {
 	}
 	s.mu.Unlock()
 
-	log.Printf("%s [Server %d] [Backup] Leader %d suspected failed, starting Ring election after delay", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
+	nextPeerID, nextAddr, found := s.getNextAlivePeer(s.config.nextPeerIndex)
+	if !found {
+		log.Printf("%s [Server %d] [Leader] No alive peer, self-elect as leader", time.Now().Format("2006-01-02 15:04:05"), s.config.myID)
+		s.setLeader(s.config.myID)
+		s.broadcastCoordinator()
+		return
+	}
 
-	nextAddr := s.config.addressMap[s.config.peers[s.config.nextPeerIndex]]
 	conn, err := grpc.NewClient(nextAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		log.Printf("%s [Server %d] [Backup] Cannot reach next peer %d for election: %v", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, s.config.peers[s.config.nextPeerIndex], err)
+		log.Printf("%s [Server %d] [Backup] Cannot reach next alive peer %d (%s): %v", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, nextPeerID, nextAddr, err)
 		return
 	}
 	client := pb.NewElectionServiceClient(conn)
@@ -93,8 +131,40 @@ func (s *UserServer) initiateElection() {
 	_, err = client.SendElection(ctx, &pb.ServerID{ID: int32(s.config.myID)})
 	conn.Close()
 	if err != nil {
-		log.Printf("%s [Server %d] [Backup] Election message failed to %d: %v", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, s.config.peers[s.config.nextPeerIndex], err)
+		log.Printf("%s [Server %d] [Backup] Election message failed to %d: %v", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, nextPeerID, err)
 	}
+}
+
+func (s *UserServer) forwardElection(sendID int, currentIndex int) error {
+	peers := s.config.peers
+	n := len(peers)
+
+	for attempt := range n {
+		idx := (currentIndex + attempt) % n
+		peerID := peers[idx]
+		if peerID == s.config.myID {
+			continue
+		}
+
+		addr := s.config.addressMap[peerID]
+		conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		if err != nil {
+			log.Printf("%s [Server %d] Skip dead peer %d (%s) during forward", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, peerID, addr)
+			continue
+		}
+
+		client := pb.NewElectionServiceClient(conn)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		_, err = client.SendElection(ctx, &pb.ServerID{ID: int32(sendID)})
+		cancel()
+		conn.Close()
+
+		if err == nil {
+			return nil
+		}
+	}
+
+	return nil
 }
 
 func (s *UserServer) SendElection(ctx context.Context, req *pb.ServerID) (*pb.EmptyRequest, error) {
@@ -103,29 +173,23 @@ func (s *UserServer) SendElection(ctx context.Context, req *pb.ServerID) (*pb.Em
 	s.mu.Lock()
 	myID := s.config.myID
 	nextIndex := s.config.nextPeerIndex
-	nextAddr := s.config.addressMap[s.config.peers[nextIndex]]
 	s.mu.Unlock()
 
 	if candidateID == myID {
-		log.Printf("%s [Server %d] Ring election completed, I am the new Leader (ID=%d)", time.Now().Format("2006-01-02 15:04:05"), myID, myID)
 		s.setLeader(myID)
 		s.broadcastCoordinator()
+		log.Printf("%s [Server %d] [Leader] Ring election completed, became Leader", time.Now().Format("2006-01-02 15:04:05"), s.config.myID)
 		return &pb.EmptyRequest{}, nil
 	}
 
 	sendID := max(candidateID, myID)
 
-	conn, err := grpc.NewClient(nextAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	err := s.forwardElection(sendID, nextIndex)
 	if err != nil {
-		log.Printf("%s [Server %d] Cannot forward election to next %d: %v", time.Now().Format("2006-01-02 15:04:05"), myID, s.config.peers[nextIndex], err)
 		return &pb.EmptyRequest{}, err
 	}
-	client := pb.NewElectionServiceClient(conn)
-	ctx2, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, err = client.SendElection(ctx2, &pb.ServerID{ID: int32(sendID)})
-	conn.Close()
-	return &pb.EmptyRequest{}, err
+
+	return &pb.EmptyRequest{}, nil
 }
 
 func (s *UserServer) broadcastCoordinator() {
@@ -150,6 +214,7 @@ func (s *UserServer) broadcastCoordinator() {
 func (s *UserServer) SendCoordinator(ctx context.Context, req *pb.ServerID) (*pb.EmptyRequest, error) {
 	newLeader := int(req.ID)
 	s.setLeader(newLeader)
+	log.Printf("%s [Server %d] [Backup] Ring election completed, follows the Leader %d", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, newLeader)
 	return &pb.EmptyRequest{}, nil
 }
 
