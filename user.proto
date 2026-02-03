@@ -57,7 +57,7 @@ message SuccessResponse {
 }
 
 message ServerID {
-  int32 ID = 1;
+  int32 ServerID = 1;
 }
 
 service UserService {
@@ -74,8 +74,8 @@ service UserService {
 }
 
 service ElectionService {
-  rpc SendElection(ServerID) returns (EmptyRequest);
-  rpc SendCoordinator(ServerID) returns (EmptyRequest);
+  rpc SendElection(ServerID) returns (SuccessResponse);
+  rpc SendCoordinator(ServerID) returns (SuccessResponse);
   rpc GetLeader(EmptyRequest) returns (ServerID);
-  rpc Ping(EmptyRequest) returns (EmptyRequest);
+  rpc Ping(EmptyRequest) returns (SuccessResponse);
 }
