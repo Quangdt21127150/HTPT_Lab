@@ -53,6 +53,7 @@ type UserServer struct {
 	electionTriggered   bool
 	electionTriggeredMu sync.Mutex
 	leaderFailed        bool
+	leaderFailTimer     *time.Timer
 	healthCheckStop     chan bool
 }
 
@@ -262,27 +263,23 @@ func (s *UserServer) checkIsLeader() bool {
 	return s.isLeader
 }
 
-func (s *UserServer) setLeader(leaderID int) {
+func (s *UserServer) setLeader(id int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.currentLeader = leaderID
-	s.isLeader = (leaderID == s.config.myID)
-	log.Printf("%s [Server %d] Server %d became Leader", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, leaderID)
-
-	s.electionTriggeredMu.Lock()
-	s.electionTriggered = false
-	s.electionTriggeredMu.Unlock()
-
-	if leaderID == s.config.myID {
-		select {
-		case s.healthCheckStop <- true:
-		default:
+	s.currentLeader = id
+	s.isLeader = (id == s.config.myID)
+	if s.isLeader {
+		s.saveLeaderToMarker(id)
+		if s.healthCheckStop != nil {
+			close(s.healthCheckStop)
+			s.healthCheckStop = make(chan bool, 1)
+			s.electionTriggeredMu.Lock()
+			s.electionTriggered = false
+			s.electionTriggeredMu.Unlock()
 		}
+	} else if !s.electionTriggered {
+		go s.monitorLeaderHealth()
 	}
-}
-
-func handleLeaderFailed() {
-
 }
 
 func (s *UserServer) monitorLeaderHealth() {
@@ -304,12 +301,25 @@ func (s *UserServer) monitorLeaderHealth() {
 			}
 
 			if !s.isLeaderAlive(currentLeader) && !s.leaderFailed {
+				s.electionTriggeredMu.Lock()
 				s.leaderFailed = true
-				log.Printf("%s [Server %d] [Backup] Leader %d is failed", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
-				handleLeaderFailed()
+				log.Printf("%s [Server %d] [Backup] Leader %d suspected failed", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
+				s.electionTriggered = true
+				s.leaderFailTimer = time.AfterFunc(10*time.Second, func() {
+					log.Printf("%s [Server %d] [Backup] Timeout when connecting to Leader %d, starting Ring election after delay", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
+					s.initiateElection()
+				})
+				s.electionTriggeredMu.Unlock()
+
 			} else if s.isLeaderAlive(currentLeader) && s.leaderFailed {
+				s.electionTriggeredMu.Lock()
 				s.leaderFailed = false
-				log.Printf("%s [Server %d] [Backup] Leader %d is restarted", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
+				if s.leaderFailTimer != nil {
+					s.leaderFailTimer.Stop()
+					s.leaderFailTimer = nil
+				}
+				s.electionTriggered = false
+				s.electionTriggeredMu.Unlock()
 			}
 		}
 	}
