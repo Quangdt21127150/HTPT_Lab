@@ -435,10 +435,10 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ElectionServiceClient interface {
-	SendElection(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*EmptyRequest, error)
-	SendCoordinator(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*EmptyRequest, error)
+	SendElection(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*SuccessResponse, error)
+	SendCoordinator(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*SuccessResponse, error)
 	GetLeader(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*ServerID, error)
-	Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*EmptyRequest, error)
+	Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*SuccessResponse, error)
 }
 
 type electionServiceClient struct {
@@ -449,9 +449,9 @@ func NewElectionServiceClient(cc grpc.ClientConnInterface) ElectionServiceClient
 	return &electionServiceClient{cc}
 }
 
-func (c *electionServiceClient) SendElection(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*EmptyRequest, error) {
+func (c *electionServiceClient) SendElection(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyRequest)
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, ElectionService_SendElection_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -459,9 +459,9 @@ func (c *electionServiceClient) SendElection(ctx context.Context, in *ServerID, 
 	return out, nil
 }
 
-func (c *electionServiceClient) SendCoordinator(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*EmptyRequest, error) {
+func (c *electionServiceClient) SendCoordinator(ctx context.Context, in *ServerID, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyRequest)
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, ElectionService_SendCoordinator_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -479,9 +479,9 @@ func (c *electionServiceClient) GetLeader(ctx context.Context, in *EmptyRequest,
 	return out, nil
 }
 
-func (c *electionServiceClient) Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*EmptyRequest, error) {
+func (c *electionServiceClient) Ping(ctx context.Context, in *EmptyRequest, opts ...grpc.CallOption) (*SuccessResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(EmptyRequest)
+	out := new(SuccessResponse)
 	err := c.cc.Invoke(ctx, ElectionService_Ping_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -493,10 +493,10 @@ func (c *electionServiceClient) Ping(ctx context.Context, in *EmptyRequest, opts
 // All implementations must embed UnimplementedElectionServiceServer
 // for forward compatibility.
 type ElectionServiceServer interface {
-	SendElection(context.Context, *ServerID) (*EmptyRequest, error)
-	SendCoordinator(context.Context, *ServerID) (*EmptyRequest, error)
+	SendElection(context.Context, *ServerID) (*SuccessResponse, error)
+	SendCoordinator(context.Context, *ServerID) (*SuccessResponse, error)
 	GetLeader(context.Context, *EmptyRequest) (*ServerID, error)
-	Ping(context.Context, *EmptyRequest) (*EmptyRequest, error)
+	Ping(context.Context, *EmptyRequest) (*SuccessResponse, error)
 	mustEmbedUnimplementedElectionServiceServer()
 }
 
@@ -507,16 +507,16 @@ type ElectionServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedElectionServiceServer struct{}
 
-func (UnimplementedElectionServiceServer) SendElection(context.Context, *ServerID) (*EmptyRequest, error) {
+func (UnimplementedElectionServiceServer) SendElection(context.Context, *ServerID) (*SuccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendElection not implemented")
 }
-func (UnimplementedElectionServiceServer) SendCoordinator(context.Context, *ServerID) (*EmptyRequest, error) {
+func (UnimplementedElectionServiceServer) SendCoordinator(context.Context, *ServerID) (*SuccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendCoordinator not implemented")
 }
 func (UnimplementedElectionServiceServer) GetLeader(context.Context, *EmptyRequest) (*ServerID, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLeader not implemented")
 }
-func (UnimplementedElectionServiceServer) Ping(context.Context, *EmptyRequest) (*EmptyRequest, error) {
+func (UnimplementedElectionServiceServer) Ping(context.Context, *EmptyRequest) (*SuccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedElectionServiceServer) mustEmbedUnimplementedElectionServiceServer() {}

@@ -78,9 +78,9 @@ func loadConfig() ServerConfig {
 func main() {
 	config := loadConfig()
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 3000+config.myID))
+	lisPeer, err := net.Listen("tcp", fmt.Sprintf(":%d", 3000+config.myID))
 	if err != nil {
-		log.Fatalf("%s [Server %d] Failed to listen: %v", time.Now().Format("2006-01-02 15:04:05"), config.myID, err)
+		log.Fatalf("[Server %d] Failed to listen on peer port %d: %v", config.myID, 3000+config.myID, err)
 	}
 
 	srv := NewUserServer(&config)
@@ -90,13 +90,30 @@ func main() {
 		role = "Leader"
 	}
 
-	log.Printf("%s [Server %d] [%s] Running on localhost:%d", time.Now().Format("2006-01-02 15:04:05"), config.myID, role, 3000+config.myID)
-
 	grpcServer := grpc.NewServer()
 	pb.RegisterUserServiceServer(grpcServer, srv)
 	pb.RegisterElectionServiceServer(grpcServer, srv)
 
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatalf("%s [Server %d] [%s] Failed to serve: %v", time.Now().Format("2006-01-02 15:04:05"), config.myID, role, err)
+	go func() {
+		log.Printf("%s [Server %d] [%s] Running on localhost:%d", time.Now().Format("2006-01-02 15:04:05"), config.myID, role, 3000+config.myID)
+		if err := grpcServer.Serve(lisPeer); err != nil {
+			log.Printf("%s [Server %d] [%s] Peer listener stopped: %v", time.Now().Format("2006-01-02 15:04:05"), config.myID, role, err)
+		}
+	}()
+
+	if srv.isLeader {
+		clientLis, err := net.Listen("tcp", ":3000")
+		if err != nil {
+			log.Printf("%s [Server %d] [Leader] WARNING: Cannot bind client port 3000: %v", time.Now().Format("2006-01-02 15:04:05"), config.myID, err)
+		} else {
+			log.Printf("%s [Server %d] [Leader] Listening for Client on port 3000", time.Now().Format("2006-01-02 15:04:05"), config.myID)
+			go func() {
+				if err := grpcServer.Serve(clientLis); err != nil && err != grpc.ErrServerStopped {
+					log.Printf("[Server %d] Client listener stopped: %v", config.myID, err)
+				}
+			}()
+		}
 	}
+
+	select {}
 }

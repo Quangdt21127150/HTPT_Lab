@@ -652,12 +652,12 @@ const file_user_proto_rawDesc = "" +
 	"\x06Delete\x12\x0f.user.IDRequest\x1a\x15.user.SuccessResponse\x12:\n" +
 	"\x0fReplicateInsert\x12\x10.user.SetRequest\x1a\x15.user.SuccessResponse\x127\n" +
 	"\fReplicateSet\x12\x10.user.SetRequest\x1a\x15.user.SuccessResponse\x129\n" +
-	"\x0fReplicateDelete\x12\x0f.user.IDRequest\x1a\x15.user.SuccessResponse2\xdd\x01\n" +
-	"\x0fElectionService\x122\n" +
-	"\fSendElection\x12\x0e.user.ServerID\x1a\x12.user.EmptyRequest\x125\n" +
-	"\x0fSendCoordinator\x12\x0e.user.ServerID\x1a\x12.user.EmptyRequest\x12/\n" +
-	"\tGetLeader\x12\x12.user.EmptyRequest\x1a\x0e.user.ServerID\x12.\n" +
-	"\x04Ping\x12\x12.user.EmptyRequest\x1a\x12.user.EmptyRequestB\bZ\x06./userb\x06proto3"
+	"\x0fReplicateDelete\x12\x0f.user.IDRequest\x1a\x15.user.SuccessResponse2\xe6\x01\n" +
+	"\x0fElectionService\x125\n" +
+	"\fSendElection\x12\x0e.user.ServerID\x1a\x15.user.SuccessResponse\x128\n" +
+	"\x0fSendCoordinator\x12\x0e.user.ServerID\x1a\x15.user.SuccessResponse\x12/\n" +
+	"\tGetLeader\x12\x12.user.EmptyRequest\x1a\x0e.user.ServerID\x121\n" +
+	"\x04Ping\x12\x12.user.EmptyRequest\x1a\x15.user.SuccessResponseB\bZ\x06./userb\x06proto3"
 
 var (
 	file_user_proto_rawDescOnce sync.Once
@@ -709,10 +709,10 @@ var file_user_proto_depIdxs = []int32{
 	8,  // 21: user.UserService.ReplicateInsert:output_type -> user.SuccessResponse
 	8,  // 22: user.UserService.ReplicateSet:output_type -> user.SuccessResponse
 	8,  // 23: user.UserService.ReplicateDelete:output_type -> user.SuccessResponse
-	2,  // 24: user.ElectionService.SendElection:output_type -> user.EmptyRequest
-	2,  // 25: user.ElectionService.SendCoordinator:output_type -> user.EmptyRequest
+	8,  // 24: user.ElectionService.SendElection:output_type -> user.SuccessResponse
+	8,  // 25: user.ElectionService.SendCoordinator:output_type -> user.SuccessResponse
 	9,  // 26: user.ElectionService.GetLeader:output_type -> user.ServerID
-	2,  // 27: user.ElectionService.Ping:output_type -> user.EmptyRequest
+	8,  // 27: user.ElectionService.Ping:output_type -> user.SuccessResponse
 	15, // [15:28] is the sub-list for method output_type
 	2,  // [2:15] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
