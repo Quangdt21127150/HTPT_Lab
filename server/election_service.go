@@ -89,11 +89,11 @@ func (s *UserServer) GetLeader(ctx context.Context, req *pb.EmptyRequest) (*pb.S
 	return &pb.ServerID{ServerID: int32(s.currentLeader)}, nil
 }
 
-func (s *UserServer) getNextAlivePeer(startIndex int) (int, string, bool) {
+func (s *UserServer) getNextAlivePeer(startIndex int) (string, bool) {
 	peers := s.config.peers
 	n := len(peers)
 	if n <= 1 {
-		return -1, "", false
+		return "", false
 	}
 
 	for i := range n {
@@ -116,10 +116,10 @@ func (s *UserServer) getNextAlivePeer(startIndex int) (int, string, bool) {
 		conn.Close()
 
 		if err == nil {
-			return peerID, addr, true
+			return addr, true
 		}
 	}
-	return -1, "", false
+	return "", false
 }
 
 func (s *UserServer) initiateElection() {
@@ -131,7 +131,7 @@ func (s *UserServer) initiateElection() {
 	}
 	s.mu.Unlock()
 
-	nextPeerID, nextAddr, found := s.getNextAlivePeer(s.config.nextPeerIndex)
+	nextAddr, found := s.getNextAlivePeer(s.config.nextPeerIndex)
 	if !found {
 		log.Printf("%s [Server %d] [Leader] No alive peer, self-elect as leader", time.Now().Format("2006-01-02 15:04:05"), s.config.myID)
 		s.setLeader(s.config.myID)
@@ -140,15 +140,12 @@ func (s *UserServer) initiateElection() {
 		return
 	}
 
-	conn, err := grpc.NewClient(nextAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, _ := grpc.NewClient(nextAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	client := pb.NewElectionServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err = client.SendElection(ctx, &pb.ServerID{ServerID: int32(s.config.myID)})
+	client.SendElection(ctx, &pb.ServerID{ServerID: int32(s.config.myID)})
 	conn.Close()
-	if err != nil {
-		log.Printf("%s [Server %d] [Backup] Election message failed to %d: %v", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, nextPeerID, err)
-	}
 }
 
 func (s *UserServer) forwardElection(sendID int, currentIndex int) error {
@@ -191,6 +188,18 @@ func (s *UserServer) SendElection(ctx context.Context, req *pb.ServerID) (*pb.Su
 	s.mu.Unlock()
 
 	if candidateID == myID {
+		s.electionTriggeredMu.Lock()
+		alreadyHandled := !s.electionTriggered
+		s.electionTriggeredMu.Unlock()
+
+		if alreadyHandled {
+			return &pb.SuccessResponse{Success: true}, nil
+		}
+
+		s.electionTriggeredMu.Lock()
+		s.electionTriggered = false
+		s.electionTriggeredMu.Unlock()
+
 		s.setLeader(myID)
 		s.broadcastCoordinator()
 		log.Printf("%s [Server %d] [Leader] Ring election completed, became Leader", time.Now().Format("2006-01-02 15:04:05"), s.config.myID)

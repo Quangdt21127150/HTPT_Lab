@@ -295,18 +295,22 @@ func (s *UserServer) monitorLeaderHealth() {
 			}
 
 			if !s.isLeaderAlive(currentLeader) && !s.leaderFailed {
-				s.electionTriggeredMu.Lock()
+
 				s.leaderFailed = true
 				log.Printf("%s [Server %d] [Backup] Leader %d suspected failed", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
-				s.electionTriggered = true
 				s.leaderFailTimer = time.AfterFunc(10*time.Second, func() {
+					s.electionTriggeredMu.Lock()
+					s.electionTriggered = true
 					log.Printf("%s [Server %d] [Backup] Timeout when connecting to Leader %d, starting Ring election after delay", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
+					s.electionTriggeredMu.Unlock()
+					s.electionTriggeredMu.Lock()
 					s.initiateElection()
+					s.electionTriggeredMu.Unlock()
 				})
-				s.electionTriggeredMu.Unlock()
 
 			} else if s.isLeaderAlive(currentLeader) && s.leaderFailed {
 				s.electionTriggeredMu.Lock()
+				log.Printf("%s [Server %d] [Backup] Leader %d suspected started", time.Now().Format("2006-01-02 15:04:05"), s.config.myID, currentLeader)
 				s.leaderFailed = false
 				if s.leaderFailTimer != nil {
 					s.leaderFailTimer.Stop()
